@@ -1,0 +1,93 @@
+apply plugin: 'java'
+apply plugin: 'application'
+mainClassName = "com.rick.Main"
+//buildscript using in the root gradle, here is a jdbc setting
+buildscript{
+	repositories{
+		maven {url "https://maven.atlassian.com/3rdparty"}
+		mavenCentral()
+	}
+	//must set classpath to let gradle know what need import
+	dependencies{
+		classpath('postgresql:postgresql:9.4.1208-jdbc42-atlassian-hosted')
+	}
+}
+
+//current gradle using 
+repositories{
+	maven {url "https://maven.atlassian.com/3rdparty"}
+	mavenCentral()
+}
+
+dependencies{
+	// https://mvnrepository.com/artifact/org.json/json
+	compile group: 'org.json', name: 'json', version: '20090211'
+	// https://mvnrepository.com/artifact/postgresql/postgresql
+	runtime group: 'postgresql', name: 'postgresql', version: '9.4.1208-jdbc42-atlassian-hosted'
+	//compile('postgresql:postgresql:9.4.1208-jdbc42-atlassian-hosted') 
+	testCompile group: 'junit', name: 'junit', version: '4.+'
+}
+
+jar{
+	manifest{
+		attributes 'Main-Class':"com.rick.Main"
+	}
+	//All dependencies in one jar
+	/*from {
+		configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+	}*/
+}
+
+task fatJar(type: Jar) {
+	manifest.from jar.manifest
+	classifier = 'all'
+	from {
+		configurations.runtime.collect { it.isDirectory() ? it : zipTree(it) }
+	} {
+		exclude "META-INF/*.SF"
+		exclude "META-INF/*.DSA"
+		exclude "META-INF/*.RSA"
+	}
+	with jar
+}
+//this will add a new jar file in libs called "example-all.jar" which contain all dependencies.
+artifacts {
+    archives fatJar
+}
+
+
+
+task alldep{
+	doLast{
+		println "All DEPENDENCY"
+		project.configurations.runtime.each{
+			println it.getName()
+		}
+	}
+}
+
+//0,1,2,3
+4.times { counter->
+	task "task$counter"  {
+		doLast{
+			println "Task Number $counter"
+		}
+	}
+}
+
+//this task test for remote postgresql db is connected...
+import groovy.sql.Sql
+apply plugin: 'groovy'
+task jdbctest{
+
+	doLast{
+		println "jdbc drivers: "+Class.forName("org.postgresql.Driver")
+		println "connecting to database"
+		def sql= Sql.newInstance("jdbc:postgresql://ec2-54-163-234-140.compute-1.amazonaws.com:5432/dat6a739fq4uhg?sslmode=require","anqjcagciofbxt","de4155895419470f1bf4eb3b24ecf21392133a876f7d7bff36ea64078d37c33b")
+		//sql.execute("select * from ticks")
+		sql.eachRow('select * from ticks'){ row->
+			println "$row"
+		}
+		sql.close()
+	}
+}
